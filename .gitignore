@@ -5,7 +5,6 @@ target/
 *.war
 *.log
 hs_err_pid*
-.mvn/wrapper/maven-wrapper.jar
 
 # --- Node / frontend ---
 node_modules/
