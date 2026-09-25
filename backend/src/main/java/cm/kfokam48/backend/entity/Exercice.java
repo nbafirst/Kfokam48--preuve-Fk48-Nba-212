@@ -20,6 +20,13 @@ public class Exercice {
     @JoinColumn(name = "etudiant_id", nullable = false)
     public Etudiant etudiant;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "relecteur_id")
+    public Etudiant relecteur;
+
+    @OneToOne(mappedBy = "exercice", fetch = FetchType.LAZY)
+    public Relecture relecture;
+
     @Column(nullable = false, length = 2048)
     public String lien;
 

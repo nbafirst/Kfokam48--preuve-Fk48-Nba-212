@@ -1,5 +1,6 @@
 package cm.kfokam48.backend.service;
 
+import cm.kfokam48.backend.dto.SessionClotureeDto;
 import cm.kfokam48.backend.dto.SessionCreeDto;
 import cm.kfokam48.backend.dto.SessionCreationDto;
 import cm.kfokam48.backend.entity.Promotion;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class ServiceSession {
@@ -48,6 +50,29 @@ public class ServiceSession {
 
         session = sessions.save(session);
         return new SessionCreeDto(session.id, session.code, session.ouvertureAt, session.expirationAt);
+    }
+
+    /**
+     * EF12/RG8/RG13 : le formateur clôture la session.
+     * 404 SESSION_INCONNUE — 409 SESSION_DEJA_CLOTUREE.
+     * Après clôture : présence, dépôt, remplacement de lien et correction de note sont refusés.
+     */
+    @Transactional
+    public SessionClotureeDto cloturer(Long sessionId) {
+        SessionCours session = sessions.findById(sessionId)
+                .orElseThrow(() -> new ApiException("SESSION_INCONNUE",
+                        "Cette session n'existe pas.", 404));
+
+        if (session.estCloturee()) {
+            throw new ApiException("SESSION_DEJA_CLOTUREE",
+                    "Cette session est déjà clôturée.", 409);
+        }
+
+        Instant clotureAt = horloge.instant();
+        session.clotureAt = clotureAt;
+        sessions.save(session);
+
+        return new SessionClotureeDto(session.id, clotureAt);
     }
 
     private String genererCode() {
