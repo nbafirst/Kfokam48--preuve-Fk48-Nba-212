@@ -8,9 +8,15 @@ import java.util.Optional;
 
 public interface RelectureRepository extends JpaRepository<Relecture, Long> {
 
-    Optional<Relecture> findByExerciceId(Long exerciceId);
+    List<Relecture> findByExerciceIdOrderByNumero(Long exerciceId);
+
+    Optional<Relecture> findByExerciceIdAndNumero(Long exerciceId, Integer numero);
 
     List<Relecture> findByRelecteurIdAndRendueAtIsNull(Long relecteurId);
 
     List<Relecture> findByRendueAtIsNull();
+
+    long countByExerciceId(Long exerciceId);
+
+    boolean existsByExerciceIdAndRelecteurId(Long exerciceId, Long relecteurId);
 }

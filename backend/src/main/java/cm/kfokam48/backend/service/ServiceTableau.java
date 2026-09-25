@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
  * Pour chaque étudiant de la promotion : nombre de présences, nombre d'exercices déposés,
  * moyenne des notes reçues (null si aucune note), nombre de relectures en attente.
  * La moyenne est calculée par l'API (RG15, F3 du sujet).
+ * Enveloppe étape 3 : moyenne = moyenne des moyennes par exercice (PROVISIONAL = note unique, FINAL = moyenne des 2).
  */
 @Service
 public class ServiceTableau {
@@ -65,11 +66,21 @@ public class ServiceTableau {
                 .collect(Collectors.groupingBy(e -> e.etudiant.id, Collectors.counting()));
 
         // Notes reçues par étudiant (moyenne calculée par l'API)
+        // Pour chaque exercice RELU : calculer la moyenne de ses relectures rendues
+        // Puis faire la moyenne des moyennes par étudiant (RG15 + RG16)
         Map<Long, Double> moyenneParEtudiant = tousExercices.stream()
-                .filter(e -> e.statut == StatutExercice.RELU && e.relecture != null && e.relecture.note != null)
+                .filter(e -> e.statut == StatutExercice.RELU)
+                .filter(e -> !e.relectures.isEmpty())
                 .collect(Collectors.groupingBy(
                         e -> e.etudiant.id,
-                        Collectors.averagingInt(e -> e.relecture.note)
+                        Collectors.averagingDouble(e -> {
+                            // Moyenne des notes de cet exercice (1 ou 2 relectures)
+                            return e.relectures.stream()
+                                    .filter(r -> r.rendueAt != null && r.note != null)
+                                    .mapToInt(r -> r.note)
+                                    .average()
+                                    .orElse(0.0);
+                        })
                 ));
 
         // Relectures en attente par étudiant (relecteur = l'étudiant)

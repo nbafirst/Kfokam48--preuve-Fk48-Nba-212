@@ -278,17 +278,18 @@ paths:
           schema: { type: integer, format: int64 }
       responses:
         "200":
-          description: Relectures assignées non rendues (exercice, auteur masqué, lien)
+          description: Relectures assignées non rendues (exercice, auteur masqué, lien, numero)
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
-                  required: [relectureId, exerciceId, lien, sessionTitre]
+                  required: [relectureId, exerciceId, numero, lien, sessionTitre]
                   properties:
                     relectureId: { type: integer, format: int64 }
                     exerciceId: { type: integer, format: int64 }
+                    numero: { type: integer, minimum: 1, maximum: 2 }  # 1 ou 2 (deux relecteurs par exercice)
                     lien: { type: string, format: uri }
                     sessionTitre: { type: string }
         "404": { $ref: "#/components/responses/Erreur" }   # ETUDIANT_INCONNU
@@ -319,7 +320,7 @@ paths:
 
   /api/etudiants/{id}/resultats:
     get:
-      summary: Notes et commentaires reçus par l'étudiant, sans nom du relecteur (EF11, RG10)
+      summary: Notes et commentaires reçus par l'étudiant, sans nom du relecteur (EF11, RG10, RG16)
       parameters:
         - name: id
           in: path
@@ -327,24 +328,31 @@ paths:
           schema: { type: integer, format: int64 }
       responses:
         "200":
-          description: Résultats par exercice déposé
+          description: Résultats par exercice déposé avec statut de note (AUCUNE/PROVISIONAL/FINAL)
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
-                  required: [exerciceId, sessionTitre, statut]
+                  required: [exerciceId, sessionTitre, statut, statutNote, nbEvaluations]
                   properties:
                     exerciceId: { type: integer, format: int64 }
                     sessionTitre: { type: string }
                     statut: { type: string }        # EN_ATTENTE | ASSIGNE | RELU
-                    note:
-                      type: integer
-                      minimum: 0
-                      maximum: 20
-                      nullable: true
-                    commentaire: { type: string, nullable: true }
+                    statutNote: { type: string, enum: [AUCUNE, PROVISIONAL, FINAL] }
+                    nbEvaluations: { type: integer, minimum: 0, maximum: 2 }
+                    moyenne: { type: number, nullable: true }           # note unique si PROVISIONAL, moyenne si FINAL
+                    noteUnique: { type: integer, minimum: 0, maximum: 20, nullable: true }   # si PROVISIONAL
+                    commentaireUnique: { type: string, nullable: true }                     # si PROVISIONAL
+                    evaluations:                                   # si FINAL (2 évaluations)
+                      type: array
+                      items:
+                        type: object
+                        required: [note, commentaire]
+                        properties:
+                          note: { type: integer, minimum: 0, maximum: 20 }
+                          commentaire: { type: string }
         "404": { $ref: "#/components/responses/Erreur" }   # ETUDIANT_INCONNU
 
 components:
@@ -369,7 +377,8 @@ components:
         DEJA_PRESENT, LIEN_INVALIDE, EXERCICE_DEJA_DEPOSE, NOTE_INVALIDE,
         AUTO_RELECTURE, RELECTURE_DEJA_RENDUE, PROMOTION_INCONNUE,
         SESSION_INCONNUE, SESSION_CLOTUREE, SESSION_DEJA_CLOTUREE,
-        LIEN_VERROUILLE, EXERCICE_INCONNU, RELECTURE_INCONNUE, ETUDIANT_INCONNU.
+        LIEN_VERROUILLE, EXERCICE_INCONNU, RELECTURE_INCONNUE, ETUDIANT_INCONNU,
+        RELECTEUR_DEJA_ASSIGNE.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Erreur" }

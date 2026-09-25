@@ -32,15 +32,15 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 - Blocage 2 minutes après 5 codes erronés (EF3, RG3)
 - Ajout manuel de présence par le formateur, marquée « ajouté par le formateur » (EF4, Q14)
 - Dépôt d'un lien d'exercice par session (EF5), remplacement du lien tant que la relecture n'a pas commencé (EF6, Q13)
-- Assignation aléatoire d'un relecteur parmi les présents (EF7, Q7)
+- Assignation aléatoire de **deux** relecteurs distincts parmi les présents (EF7, Q7)
 - Relecture avec note entière 0–20 et commentaire (EF8, Q9), correction tant que la session n'est pas clôturée (EF9, Q10)
+- **Deux évaluations par exercice : note finale = moyenne des deux ; une seule évaluation → note PROVISIONAL**
 - Tableau du formateur : présences, dépôts, moyenne des notes reçues, relectures en attente (EF10, Q16)
-- Consultation par l'étudiant de sa note et de son commentaire, sans nom du relecteur (EF11, Q8)
+- Consultation par l'étudiant de sa note et de son commentaire, sans nom du relecteur, distinction PROVISIONAL/FINAL (EF11, Q8)
 - Clôture de session par le formateur, qui fige présences, dépôts et notes (EF12, Q3, Q10, Q12)
 
 **Explicitement exclu :**
 - Authentification par mot de passe : l'étudiant se choisit dans une liste (Q1)
-- Deuxième relecteur par exercice (Q6 : un seul)
 - Notation du relecteur ou du commentaire par le formateur
 - Dépôt de fichiers joints : seul un lien est déposé
 - Notifications (e-mail, SMS, push) de toute nature
@@ -58,11 +58,11 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 | EF4 | Le formateur ajoute une présence à la main | Quand le formateur ajoute un étudiant absent, la présence est créée avec `source=FORMATEUR` et « ajouté par le formateur » apparaît dans le tableau | Must |
 | EF5 | L'étudiant dépose le lien de son exercice | Quand un étudiant dépose un lien valide pour une session non clôturée, l'exercice passe en `EN_ATTENTE` ; un second dépôt est refusé | Must |
 | EF6 | L'étudiant remplace son lien tant que personne n'a commencé à le relire | Quand le relecteur n'a pas encore rendu sa note, le dépôt d'un nouveau lien remplace l'ancien ; après le début de la relecture, le remplacement est refusé (Q13) | Should |
-| EF7 | Le système assigne un relecteur au hasard parmi les étudiants présents à la session | Quand un exercice est déposé, un relecteur est choisi au hasard parmi les étudiants présents, à l'exclusion de l'auteur ; l'exercice passe en `ASSIGNE` | Must |
-| EF8 | Le relecteur rend une note entière sur 20 et un commentaire | Quand le relecteur envoie une note entière entre 0 et 20 et un commentaire, l'exercice passe en `RELU` ; l'auteur voit la note et le commentaire sans le nom du relecteur | Must |
+| EF7 | Le système assigne **deux** relecteurs distincts au hasard parmi les étudiants présents à la session | Quand un exercice est déposé, **deux** relecteurs sont choisis au hasard parmi les étudiants présents, à l'exclusion de l'auteur et distincts l'un de l'autre ; l'exercice passe en `ASSIGNE` | Must |
+| EF8 | Le relecteur rend une note entière sur 20 et un commentaire | Quand un relecteur envoie une note entière entre 0 et 20 et un commentaire, la relecture est enregistrée ; **l'exercice passe en `RELU` seulement quand les deux relectures sont rendues** ; l'auteur voit la note et le commentaire sans le nom du relecteur | Must |
 | EF9 | Le relecteur corrige sa note tant que la session n'est pas clôturée | Quand le relecteur renvoie une note corrigée avant la clôture, la note est mise à jour ; après clôture, la correction est refusée (Q10, tranché contre Q15) | Must |
-| EF10 | Le formateur consulte le tableau récapitulatif | Pour chaque étudiant de la promotion : nombre de présences, nombre d'exercices déposés, moyenne des notes reçues (nulle si aucune note), nombre de relectures qu'il doit encore rendre ; la moyenne est calculée par l'API, jamais par le frontend | Must |
-| EF11 | L'étudiant consulte la note et le commentaire reçus | Quand une relecture est rendue, l'auteur de l'exercice voit la note et le commentaire, sans jamais voir le nom du relecteur (Q8) | Should |
+| EF10 | Le formateur consulte le tableau récapitulatif | Pour chaque étudiant de la promotion : nombre de présences, nombre d'exercices déposés, **moyenne des notes reçues (moyenne des moyennes par exercice, nulle si aucune note)**, nombre de relectures qu'il doit encore rendre ; la moyenne est calculée par l'API, jamais par le frontend | Must |
+| EF11 | L'étudiant consulte la note et le commentaire reçus | **Chaque exercice affiche son statut de note : `AUCUNE`, `PROVISIONAL` (1 évaluation), `FINAL` (2 évaluations = moyenne)** ; l'auteur voit les notes et commentaires sans jamais voir le nom du relecteur (Q8) | Should |
 | EF12 | Le formateur clôture la session | Quand le formateur clôture, plus aucune présence, dépôt, remplacement de lien ou correction de note n'est accepté ; les relectures jamais rendues restent visibles « en attente » dans le tableau (Q3, Q11, Q12) | Must |
 
 ## 5. Exigences non fonctionnelles
@@ -83,8 +83,8 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 | RG2 | Un étudiant ne peut marquer qu'une seule présence par session | Déduit de Q1/Q16 + Annexe B (409 déjà présent) |
 | RG3 | Après 5 codes erronés (inconnus ou expirés), un étudiant est bloqué 2 minutes | Q4 |
 | RG4 | Un étudiant ne peut pas relire son propre exercice | Q5 |
-| RG5 | Un seul relecteur par exercice | Q6 |
-| RG6 | Le relecteur est choisi au hasard parmi les étudiants présents à la session, à l'exclusion de l'auteur | Q7 + RG4 |
+| RG5 | **Deux relecteurs distincts par exercice** | Enveloppe étape 3 (changement de besoin) |
+| RG6 | Les relecteurs sont choisis au hasard parmi les étudiants présents à la session, à l'exclusion de l'auteur et distincts l'un de l'autre | Q7 + RG4 + Enveloppe étape 3 |
 | RG7 | La note est un entier entre 0 et 20 | Q9 |
 | RG8 | Une présence ne peut pas être marquée après la fin (clôture) de la session | Q3 |
 | RG9 | Un exercice peut être déposé jusqu'à la clôture de la session, même après l'expiration du code | Q12 |
@@ -94,6 +94,8 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 | RG13 | Le relecteur peut corriger sa note tant que la session n'est pas clôturée ; après clôture, plus rien n'est modifiable | Q10, tranché contre Q15 (section 7, C1) |
 | RG14 | Un exercice sans relecture rendue reste « en attente » et apparaît comme tel dans le tableau du formateur | Q11 |
 | RG15 | La moyenne affichée est la moyenne des notes reçues par l'étudiant, calculée par l'API ; nulle s'il n'a reçu aucune note | Q16 + F3 du sujet |
+| RG16 | **La note d'un exercice est `PROVISIONAL` avec 1 évaluation, `FINAL` (moyenne) avec 2 évaluations** | Enveloppe étape 3 |
+| RG17 | **Un même étudiant ne peut pas être assigné deux fois comme relecteur du même exercice** | Enveloppe étape 3 |
 
 ## 7. Zones d'ombre, hypothèses et contradictions
 
@@ -101,7 +103,7 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 
 | Point | Réponse client (Qx) ou hypothèse | Décision retenue | Conséquence |
 |---|---|---|---|
-| H1 — Quand la relecture est-elle assignée ? | Hypothèse (aucune Qx) : Q7 dit seulement « au hasard parmi les présents » | Assignation à chaque dépôt d'exercice : le système choisit un présent au hasard, à l'exclusion de l'auteur | Si un seul étudiant est présent et dépose, il n'y a pas de relecteur possible ; l'exercice reste `EN_ATTENTE` et apparaît dans le tableau (RG14). Cas couvert par une issue dédiée |
+| H1 — Quand la relecture est-elle assignée ? | Hypothèse (aucune Qx) : Q7 dit seulement « au hasard parmi les présents » | Assignation à chaque dépôt d'exercice : le système choisit **deux** présents au hasard, à l'exclusion de l'auteur et distincts l'un de l'autre | Si un seul étudiant est présent et dépose, il n'y a pas de relecteur possible ; l'exercice reste `EN_ATTENTE` et apparaît dans le tableau (RG14). Si deux présents (incluant l'auteur), un seul relecteur possible → l'exercice a une seule relecture assignée. Cas couvert par une issue dédiée |
 | H2 — Le relecteur est-il un acteur distinct ? | Hypothèse | Non : un étudiant assigné. Deux tables d'acteurs seulement | Modèle de données plus simple ; voir D2 |
 | H3 — Les étudiants « en liste » sans compte : que saisissent-ils ? | Q1 : l'étudiant choisit son nom dans une liste | Le frontend envoie `etudiantId` ; aucune inscription dans le périmètre | Étudiants et promotions préchargés en base (données de démo) |
 | H4 — Un étudiant absent peut-il être relecteur ? | Q7 : « présents à cette session » | Non : seuls les présents (source ETUDIANT ou FORMATEUR) sont éligibles | Une présence ajoutée à la main (RG12) rend éligible |
@@ -109,6 +111,8 @@ La direction de la formation KFOKAM48 suit à la main trois choses qui se recoup
 | H6 — Un code erroné puis expiré compte double ? | Hypothèse : Q4 dit « cinq erreurs » sans distinguer | Oui : 5 tentatives de code inconnu **ou** expiré déclenchent le blocage | Compteur par étudiant et par fenêtre de 2 minutes |
 | H7 — Le formateur voit-il qui a relu quoi ? | Q16 ne le demande pas ; Q8 interdit de montrer le nom à l'auteur | Le tableau ne montre pas les noms de relecteurs ; le formateur voit seulement les relectures en attente par étudiant | Périmètre volontairement restreint à Q16 |
 | H8 — Que voit-on d'une session clôturée ? | Hypothèse | Statut visible (ouverte/clôturée) sur le tableau ; les actions refusées renvoient les erreurs du contrat | Les erreurs de clôture sont documentées au contrat en opérations additionnelles |
+| H9 — Que se passe-t-il s'il n'y a qu'un seul relecteur possible ? | Enveloppe étape 3 | Un seul relecteur assigné → note `PROVISIONAL` ; l'exercice n'est `RELU` que quand les deux sont rendues | L'auteur voit une note provisoire ; le formateur voit la moyenne sur une seule note |
+| H10 — Le même pair peut-il être assigné deux fois ? | Enveloppe étape 3 | Non (RG17) : les deux relecteurs doivent être distincts | Validation au moment de l'assignation et du rendu |
 
 **Contradictions relevées :**
 
@@ -168,3 +172,4 @@ Ordre des six étapes tel qu'imposé. À l'étape 2, j'attaque dans cet ordre : 
 | Version | Quand | Ce qui a changé et pourquoi |
 |---|---|---|
 | 1 | 2026-09-25 | Version initiale — étape 1 |
+| 2 | 2026-09-25 | **Enveloppe étape 3 — Changement de besoin** : passage de 1 à 2 relecteurs par exercice (RG5, RG6, RG16, RG17). Mise à jour périmètre (section 3), exigences EF7/EF8/EF10/EF11 (section 4), règles de gestion (section 6), hypothèses H1/H9/H10 (section 7). Migration V7 à prévoir, contrat API à enrichir, frontend à adapter. |

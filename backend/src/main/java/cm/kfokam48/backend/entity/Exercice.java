@@ -3,6 +3,8 @@ package cm.kfokam48.backend.entity;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "exercice")
@@ -22,10 +24,10 @@ public class Exercice {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "relecteur_id")
-    public Etudiant relecteur;
+    public Etudiant relecteur; // premier relecteur assigné (numero = 1) pour compatibilité
 
-    @OneToOne(mappedBy = "exercice", fetch = FetchType.LAZY)
-    public Relecture relecture;
+    @OneToMany(mappedBy = "exercice", fetch = FetchType.LAZY)
+    public List<Relecture> relectures = new ArrayList<>();
 
     @Column(nullable = false, length = 2048)
     public String lien;

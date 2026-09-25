@@ -20,6 +20,9 @@ public class Relecture {
     @JoinColumn(name = "relecteur_id", nullable = false)
     public Etudiant relecteur;
 
+    @Column(name = "numero", nullable = false)
+    public Short numero; // 1 ou 2
+
     @Column(name = "note")
     public Integer note;
 

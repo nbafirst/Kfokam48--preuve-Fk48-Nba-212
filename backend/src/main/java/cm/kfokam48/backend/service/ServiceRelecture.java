@@ -2,6 +2,7 @@ package cm.kfokam48.backend.service;
 
 import cm.kfokam48.backend.dto.RelectureEnAttenteDto;
 import cm.kfokam48.backend.dto.RelectureRendueDto;
+import cm.kfokam48.backend.dto.ResultatExerciceDto;
 import cm.kfokam48.backend.entity.Exercice;
 import cm.kfokam48.backend.entity.Relecture;
 import cm.kfokam48.backend.entity.SessionCours;
@@ -17,14 +18,16 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * EF8 — le relecteur rend sa note et son commentaire.
- * EF9 — le relecteur corrige sa note tant que la session n'est pas clôturée (RG13, C1).
- * RG5 — un seul relecteur par exercice (contrainte UK sur relecture.exercice_id).
- * RG7 — note entière entre 0 et 20 (Q9).
- * RG10 — l'auteur ne voit jamais le nom du relecteur (Q8).
- * RG13 — correction possible jusqu'à la clôture, après plus rien n'est modifiable (Q10, C1).
- */
+ /**
+  * EF8 — le relecteur rend sa note et son commentaire.
+  * EF9 — le relecteur corrige sa note tant que la session n'est pas clôturée (RG13, C1).
+  * RG5 — deux relecteurs distincts par exercice (contrainte UK sur relecture.exercice_id, numero).
+  * RG7 — note entière entre 0 et 20 (Q9).
+  * RG10 — l'auteur ne voit jamais le nom du relecteur (Q8).
+  * RG13 — correction possible jusqu'à la clôture, après plus rien n'est modifiable (Q10, C1).
+  * RG16 — note PROVISIONAL (1 évaluation) / FINAL (2 évaluations = moyenne).
+  * RG17 — même pair ne peut pas être assigné deux fois.
+  */
 @Service
 public class ServiceRelecture {
 
@@ -45,7 +48,8 @@ public class ServiceRelecture {
      * POST /api/relectures/{id} — EF8 : le relecteur rend sa note et son commentaire.
      * 400 NOTE_INVALIDE si note non entière ou hors 0–20 (RG7).
      * 403 AUTO_RELECTURE si l'étudiant essaie de relire son propre exercice (RG4).
-     * 409 RELECTURE_DEJA_RENDUE si une relecture existe déjà (RG5).
+     * 409 RELECTURE_DEJA_RENDUE si cette relecture (numero) a déjà été rendue.
+     * 409 RELECTEUR_DEJA_ASSIGNE si le même relecteur essaie de faire les deux relectures (RG17).
      */
     @Transactional
     public void rendre(Long relectureId, Long relecteurId, RelectureRendueDto demande) {
@@ -64,20 +68,43 @@ public class ServiceRelecture {
                     "Vous ne pouvez pas relire votre propre exercice.", 403);
         }
 
+        // RG17 : vérifier que ce relecteur n'a pas déjà rendu l'autre relecture
+        if (relectures.existsByExerciceIdAndRelecteurId(relecture.exercice.id, relecteurId)) {
+            throw new ApiException("RELECTEUR_DEJA_ASSIGNE",
+                    "Vous avez déjà rendu une relecture pour cet exercice.", 409);
+        }
+
         // RG7 : note entière entre 0 et 20 (validé par @Min/@Max dans le DTO)
         relecture.note = demande.note();
         relecture.commentaire = demande.commentaire().trim();
         relecture.rendueAt = horloge.instant();
 
-        // Passer l'exercice en RELU
-        Exercice exercice = relecture.exercice;
-        exercice.statut = StatutExercice.RELU;
+        // Vérifier si les deux relectures sont rendues pour passer en RELU
+        verifierEtMettreAJourStatutExercice(relecture.exercice);
+    }
+
+    /**
+     * Vérifie si les deux relectures sont rendues et met à jour le statut de l'exercice.
+     * Si 1 relecture rendue : statut reste ASSIGNE (note PROVISIONAL)
+     * Si 2 relectures rendues : statut -> RELU (note FINAL = moyenne)
+     */
+    private void verifierEtMettreAJourStatutExercice(Exercice exercice) {
+        long nbRendues = exercice.relectures.stream()
+                .filter(r -> r.rendueAt != null)
+                .count();
+
+        if (nbRendues == 2) {
+            exercice.statut = StatutExercice.RELU;
+        }
+        // Si 1 seule rendue : reste ASSIGNE (note PROVISIONAL)
         exercices.save(exercice);
     }
 
     /**
      * POST /api/relectures/{id}/correction — EF9 : le relecteur corrige sa note (RG13, C1).
      * 409 SESSION_CLOTUREE si la session est clôturée (RG13).
+     * 404 RELECTURE_INCONNUE si la relecture n'existe pas.
+     * 403 AUTO_RELECTURE si ce n'est pas le bon relecteur.
      */
     @Transactional
     public void corriger(Long relectureId, Long relecteurId, RelectureRendueDto demande) {
@@ -110,7 +137,7 @@ public class ServiceRelecture {
 
     /**
      * GET /api/relectures/en-attente — relectures qu'un étudiant doit encore rendre (EF8, RG14).
-     * Retourne les relectures assignées non rendues (exercice, auteur masqué, lien).
+     * Retourne les relectures assignées non rendues (exercice, auteur masqué, lien, numero).
      */
     @Transactional(readOnly = true)
     public List<RelectureEnAttenteDto> enAttente(Long relecteurId) {
@@ -118,23 +145,58 @@ public class ServiceRelecture {
         return liste.stream().map(r -> new RelectureEnAttenteDto(
                 r.id,
                 r.exercice.id,
+                r.numero,
                 r.exercice.lien,
                 r.exercice.session.titre
         )).toList();
     }
 
     /**
-     * GET /api/etudiants/{id}/resultats — notes et commentaires reçus par l'étudiant (EF11, RG10).
+     * GET /api/etudiants/{id}/resultats — notes et commentaires reçus par l'étudiant (EF11, RG10, RG16).
      * L'auteur ne voit jamais le nom du relecteur (RG10).
+     * Statut note : AUCUNE / PROVISIONAL (1 éval) / FINAL (2 évals = moyenne).
      */
     @Transactional(readOnly = true)
-    public List<cm.kfokam48.backend.dto.ResultatExerciceDto> resultats(Long etudiantId) {
-        return exercices.findByEtudiantId(etudiantId).stream().map(e -> new cm.kfokam48.backend.dto.ResultatExerciceDto(
-                e.id,
-                e.session.titre,
-                e.statut.name(),
-                e.statut == StatutExercice.RELU ? e.relecture.note : null,
-                e.statut == StatutExercice.RELU ? e.relecture.commentaire : null
-        )).toList();
+    public List<ResultatExerciceDto> resultats(Long etudiantId) {
+        return exercices.findByEtudiantId(etudiantId).stream().map(e -> {
+            List<Relecture> rendues = e.relectures.stream()
+                    .filter(r -> r.rendueAt != null)
+                    .toList();
+
+            int nbEvaluations = rendues.size();
+            String statutNote;
+            Double moyenne = null;
+            Integer noteUnique = null;
+            String commentaireUnique = null;
+
+            if (nbEvaluations == 0) {
+                statutNote = "AUCUNE";
+            } else if (nbEvaluations == 1) {
+                statutNote = "PROVISIONAL";
+                noteUnique = rendues.get(0).note;
+                commentaireUnique = rendues.get(0).commentaire;
+                moyenne = noteUnique != null ? noteUnique.doubleValue() : null;
+            } else { // 2 évaluations
+                statutNote = "FINAL";
+                moyenne = rendues.stream()
+                        .mapToInt(r -> r.note != null ? r.note : 0)
+                        .average()
+                        .orElse(0.0);
+            }
+
+            return new ResultatExerciceDto(
+                    e.id,
+                    e.session.titre,
+                    e.statut.name(),
+                    statutNote,
+                    nbEvaluations,
+                    moyenne,
+                    noteUnique,
+                    commentaireUnique,
+                    nbEvaluations == 2 ? rendues.stream()
+                            .map(r -> new ResultatExerciceDto.EvaluationDto(r.note, r.commentaire))
+                            .toList() : List.of()
+            );
+        }).toList();
     }
 }

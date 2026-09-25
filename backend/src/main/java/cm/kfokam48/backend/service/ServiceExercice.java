@@ -5,6 +5,7 @@ import cm.kfokam48.backend.dto.ExerciceCreeDto;
 import cm.kfokam48.backend.dto.ExerciceLienRemplaceDto;
 import cm.kfokam48.backend.entity.Etudiant;
 import cm.kfokam48.backend.entity.Exercice;
+import cm.kfokam48.backend.entity.Relecture;
 import cm.kfokam48.backend.entity.SessionCours;
 import cm.kfokam48.backend.entity.StatutExercice;
 import cm.kfokam48.backend.exception.ApiException;
@@ -82,8 +83,8 @@ public class ServiceExercice {
         exercice.statut = StatutExercice.EN_ATTENTE;
         exercice.deposeAt = horloge.instant();
 
-        // EF7/RG6 : assigner un relecteur au hasard parmi les présents, sauf l'auteur
-        assignerRelecteur(session.id, etudiant.id, exercice);
+        // EF7/RG6 + Enveloppe étape 3 : assigner deux relecteurs distincts parmi les présents, sauf l'auteur
+        assignerRelecteurs(session.id, etudiant.id, exercice);
 
         exercice = exercices.save(exercice);
 
@@ -130,19 +131,38 @@ public class ServiceExercice {
     }
 
     /**
-     * RG6/Q7 : le relecteur est choisi au hasard parmi les étudiants présents
-     * à la session, à l'exclusion de l'auteur (RG4). Si aucun autre présent,
-     * l'exercice reste EN_ATTENTE (RG14).
+     * RG6/Q7 + Enveloppe étape 3 : les relecteurs sont choisis au hasard parmi les étudiants présents
+     * à la session, à l'exclusion de l'auteur (RG4) et distincts l'un de l'autre (RG17).
+     * Si un seul autre présent : une seule relecture assignée (numero=1).
+     * Si aucun autre présent : l'exercice reste EN_ATTENTE (RG14).
      */
-    private void assignerRelecteur(Long sessionId, Long auteurId, Exercice exercice) {
+    private void assignerRelecteurs(Long sessionId, Long auteurId, Exercice exercice) {
         List<Long> presents = presences.findEtudiantIdsBySessionId(sessionId);
         presents.remove(auteurId); // RG4 : pas de relecture de soi-même
         if (presents.isEmpty()) {
             return; // reste EN_ATTENTE, pas de relecteur possible
         }
-        Long relecteurId = presents.get(alea.nextInt(presents.size()));
-        Etudiant relecteur = etudiants.getReferenceById(relecteurId);
-        exercice.relecteur = relecteur;
+
+        // Mélanger pour tirage aléatoire
+        java.util.Collections.shuffle(presents, alea);
+
+        // Assigner jusqu'à 2 relecteurs distincts (RG5, RG17)
+        int maxRelecteurs = Math.min(2, presents.size());
+        for (int i = 0; i < maxRelecteurs; i++) {
+            Long relecteurId = presents.get(i);
+            Etudiant relecteur = etudiants.getReferenceById(relecteurId);
+            Relecture relecture = new Relecture();
+            relecture.exercice = exercice;
+            relecture.relecteur = relecteur;
+            relecture.numero = (short) (i + 1); // 1 ou 2
+            exercice.relectures.add(relecture);
+
+            // Premier relecteur -> compatibilité colonne relecteur_id dans exercice
+            if (i == 0) {
+                exercice.relecteur = relecteur;
+            }
+        }
+
         exercice.statut = StatutExercice.ASSIGNE;
     }
 
