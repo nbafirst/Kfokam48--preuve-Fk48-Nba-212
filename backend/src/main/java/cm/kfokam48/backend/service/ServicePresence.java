@@ -107,4 +107,41 @@ public class ServicePresence {
         t.survenueAt = survenueAt;
         return t;
     }
+
+    /**
+     * EF4/RG12 — le formateur ajoute une présence à la main (Q14) : elle est
+     * marquée source=FORMATEUR et se voit dans le tableau. H5 (section 7) : la
+     * clôture fige aussi les présences manuelles. RG2 : l'unicité
+     * (session_id, etudiant_id) vaut quelle que soit la source.
+     */
+    @Transactional
+    public PresenceCreeDto ajouterParLeFormateur(long sessionId, Long etudiantId) {
+        Instant maintenant = horloge.instant();
+
+        SessionCours session = sessions.findById(sessionId)
+                .orElseThrow(() -> new ApiException("SESSION_INCONNUE",
+                        "Cette session n'existe pas.", 404));
+        if (session.estCloturee()) {
+            throw new ApiException("SESSION_CLOTUREE",
+                    "La session est clôturée : plus aucune présence ne peut être ajoutée.", 409);
+        }
+
+        Etudiant etudiant = etudiants.findById(etudiantId)
+                .orElseThrow(() -> new ApiException("ETUDIANT_INCONNU",
+                        "Cet étudiant n'existe pas.", 404));
+
+        if (presences.existsBySessionIdAndEtudiantId(session.id, etudiant.id)) {
+            throw new ApiException("DEJA_PRESENT",
+                    "Cet étudiant a déjà marqué sa présence pour cette session.", 409);
+        }
+
+        Presence presence = new Presence();
+        presence.session = session;
+        presence.etudiant = etudiant;
+        presence.source = SourcePresence.FORMATEUR; // RG12
+        presence.creeAt = maintenant;
+        presence = presences.save(presence);
+
+        return new PresenceCreeDto(presence.id, session.id, etudiant.id, presence.source.name());
+    }
 }
