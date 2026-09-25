@@ -52,6 +52,13 @@ public class ServicePresence {
                 .orElseThrow(() -> new ApiException("ETUDIANT_INCONNU",
                         "Cet étudiant n'existe pas.", 404));
 
+        // RG2 — une seule présence par session ; la contrainte SQL
+        // uk_presence_session_etudiant tranche même entre requêtes concurrentes (ENF3)
+        if (presences.existsBySessionIdAndEtudiantId(session.id, etudiant.id)) {
+            throw new ApiException("DEJA_PRESENT",
+                    "Cet étudiant a déjà marqué sa présence pour cette session.", 409);
+        }
+
         Presence presence = new Presence();
         presence.session = session;
         presence.etudiant = etudiant;
